@@ -2,7 +2,7 @@
 
 Recipes from what is already at home. You name the shelf, the time, the heat, and anything the plate should skip. A recipe you like goes into a collection: breakfasts, lunches, baking, or one of your own.
 
-A recipe does not have to use every ingredient. If the apples, flour, and eggs make a better cake than a dish that also eats the chicken, the cake is the one you get. What stays on the shelf is named in the note under the summary.
+A recipe does not have to use every ingredient. If the apples, flour, and eggs make a better cake than a dish that also needs the chicken, the cake is the one you get. What stays on the shelf is named in the note under the summary.
 
 Heat is two switches: stove and oven. A knife, board, bowl, and spoon are assumed. Anything else is a note you type when you need it, such as `no mixer` or `with a mixer`.
 

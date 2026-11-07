@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 
 import { generateRecipeAction } from "@/app/actions"
 import { RecipeArticle } from "@/components/recipe-article"
@@ -126,6 +126,7 @@ export function Composer({ collections: initialCollections }: { collections: Col
   const [error, setError] = useState<string | null>(null)
   const [noteIndex, setNoteIndex] = useState(0)
   const [pending, startTransition] = useTransition()
+  const offered = useRef<{ key: string; titles: string[] }>({ key: "", titles: [] })
 
   useEffect(() => {
     const raw = localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(PREVIOUS_DRAFT_KEY)
@@ -206,16 +207,30 @@ export function Composer({ collections: initialCollections }: { collections: Col
   function generate() {
     setError(null)
     setNoteIndex(0)
+    const key = JSON.stringify({
+      ingredients: draft.ingredients,
+      exclusions: draft.exclusions,
+      notes: draft.notes,
+      required: draft.required,
+      minutes: draft.minutes,
+      servings: draft.servings,
+      heat: draft.heat,
+    })
+    if (offered.current.key !== key) offered.current = { key, titles: [] }
+    const skip = offered.current.titles
     startTransition(async () => {
-      const result = await generateRecipeAction({
-        ingredients: draft.ingredients,
-        exclusions: draft.exclusions,
-        notes: draft.notes,
-        required: draft.required,
-        minutes: draft.minutes,
-        servings: draft.servings,
-        heat: draft.heat,
-      })
+      const result = await generateRecipeAction(
+        {
+          ingredients: draft.ingredients,
+          exclusions: draft.exclusions,
+          notes: draft.notes,
+          required: draft.required,
+          minutes: draft.minutes,
+          servings: draft.servings,
+          heat: draft.heat,
+        },
+        skip,
+      )
       if (!result.ok) {
         setError(result.error)
         return
@@ -223,6 +238,7 @@ export function Composer({ collections: initialCollections }: { collections: Col
       setRecipe(result.recipe)
       setRequest(result.request)
       setGeneration((value) => value + 1)
+      if (offered.current.key === key) offered.current = { key, titles: [...skip, result.recipe.title] }
     })
   }
 
@@ -528,7 +544,7 @@ export function Composer({ collections: initialCollections }: { collections: Col
 
         {error ? <p className="mt-4 text-sm text-primary">{error}</p> : null}
         <Button type="button" className="mt-6 h-12 w-full text-base" disabled={pending || draft.ingredients.length === 0} onClick={generate}>
-          {pending ? "Cooking…" : "Make a recipe"}
+          {pending ? "Cooking…" : recipe ? "Make another" : "Make a recipe"}
         </Button>
       </section>
 

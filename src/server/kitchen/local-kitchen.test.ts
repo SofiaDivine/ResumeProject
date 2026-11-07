@@ -155,6 +155,28 @@ describe("local kitchen", () => {
     assert.equal(constraintViolation(recipe, request), null)
   })
 
+  it("makes a different dish from the same shelf on the next press", () => {
+    const request = input({
+      ingredients: ["apples", "flour", "eggs", "sugar", "butter", "chicken"],
+      heat: ["stove", "oven"],
+    })
+    const first = composeLocalRecipe(request)
+    const second = composeLocalRecipe(request, [first.title])
+    assert.match(first.title, /apple cake/i)
+    assert.notEqual(second.title.toLowerCase(), first.title.toLowerCase())
+    assert.equal(constraintViolation(second, request), null)
+
+    const seen = [first.title]
+    let latest = first
+    for (let turn = 0; turn < 20; turn += 1) {
+      latest = composeLocalRecipe(request, seen)
+      if (latest.title.toLowerCase() === first.title.toLowerCase()) break
+      seen.push(latest.title)
+    }
+    assert.equal(latest.title.toLowerCase(), first.title.toLowerCase())
+    assert.ok(seen.length > 1)
+  })
+
   it("prefers the dish that already uses a required ingredient", () => {
     const request = input({
       ingredients: ["apples", "flour", "eggs", "sugar", "butter", "chicken"],

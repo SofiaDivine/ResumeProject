@@ -23,21 +23,31 @@ export function prepareInput(input: GenerateInput): GenerateInput {
   }
 }
 
-export async function generateRecipe(input: GenerateInput): Promise<RecipeDraft> {
-  const local = composeLocalRecipe(input)
+function alreadyOffered(title: string, skipTitles: string[]) {
+  const key = title.trim().toLowerCase()
+  return skipTitles.some((item) => item.trim().toLowerCase() === key)
+}
+
+export async function generateRecipe(input: GenerateInput, skipTitles: string[] = []): Promise<RecipeDraft> {
+  const local = composeLocalRecipe(input, skipTitles)
   if (!llamaConfigured()) return local
 
+  let missed = false
   try {
-    const first = await composeLlamaRecipe(input)
+    const first = await composeLlamaRecipe(input, undefined, skipTitles)
     const problem = constraintViolation(first, input)
-    if (!problem) return first
+    if (!problem && !alreadyOffered(first.title, skipTitles)) return first
+    if (problem) missed = true
 
-    const second = await composeLlamaRecipe(input, problem)
-    if (!constraintViolation(second, input)) return second
+    const second = await composeLlamaRecipe(input, problem ?? `it repeated ${skipTitles.join(", ")}`, skipTitles)
+    if (!constraintViolation(second, input) && !alreadyOffered(second.title, skipTitles)) return second
+    missed = true
   } catch (error) {
+    missed = true
     console.error("Llama recipe failed, using the local kitchen.", error)
   }
 
+  if (!missed) return local
   return {
     ...local,
     honor: `${local.honor} The model missed a constraint, so the local kitchen wrote this one.`,

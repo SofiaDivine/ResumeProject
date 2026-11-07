@@ -36,7 +36,7 @@ function model() {
   return provider.chat(process.env.LLM_MODEL ?? "llama-3.3-70b-versatile")
 }
 
-function prompt(input: GenerateInput, repair?: string): string {
+function prompt(input: GenerateInput, repair?: string, avoidTitles: string[] = []): string {
   const heat = input.heat.length > 0 ? input.heat.join(" and ") : "no stove and no oven"
   return [
     `On the shelf: ${input.ingredients.join(", ")}.`,
@@ -46,16 +46,19 @@ function prompt(input: GenerateInput, repair?: string): string {
     `Must use, the dish has to include these: ${input.required.length > 0 ? input.required.join(", ") : "nothing"}.`,
     `Notes, follow them literally: ${input.notes.length > 0 ? input.notes.join("; ") : "none"}.`,
     `Never use: ${input.exclusions.length > 0 ? input.exclusions.join(", ") : "nothing"}.`,
+    avoidTitles.length > 0
+      ? `Do not cook these again: ${avoidTitles.join("; ")}. Make a different dish from the same shelf.`
+      : "",
     repair ? `The previous answer was rejected because ${repair}. Write a different recipe that keeps every constraint.` : "",
   ]
     .filter(Boolean)
     .join("\n")
 }
 
-export async function composeLlamaRecipe(input: GenerateInput, repair?: string): Promise<RecipeDraft> {
+export async function composeLlamaRecipe(input: GenerateInput, repair?: string, avoidTitles: string[] = []): Promise<RecipeDraft> {
   const result = await generateText({
     model: model(),
-    temperature: 0.4,
+    temperature: avoidTitles.length > 0 ? 0.7 : 0.4,
     maxOutputTokens: 1200,
     maxRetries: 0,
     abortSignal: AbortSignal.timeout(25_000),
@@ -82,7 +85,7 @@ export async function composeLlamaRecipe(input: GenerateInput, repair?: string):
       "Steps: 3 to 6 short imperative sentences.",
       `honor should confirm the constraints. A starting point: ${constraintsSentence(input)}`,
     ].join("\n"),
-    prompt: prompt(input, repair),
+    prompt: prompt(input, repair, avoidTitles),
   })
 
   const object = result.output

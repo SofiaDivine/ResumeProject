@@ -31,7 +31,16 @@ function safePath(value: FormDataEntryValue | null): string {
   return "/"
 }
 
-export async function generateRecipeAction(input: GenerateInput): Promise<GenerateResult> {
+function earlierTitles(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0 && item.length <= 100)
+    .slice(0, 24)
+}
+
+export async function generateRecipeAction(input: GenerateInput, previousTitles?: unknown): Promise<GenerateResult> {
   const parsed = parseGenerateInput(input)
   if (!parsed.success) {
     return { ok: false, error: "Check the ingredients, time, and heat. Time runs from 10 minutes to 8 hours." }
@@ -43,7 +52,7 @@ export async function generateRecipeAction(input: GenerateInput): Promise<Genera
   if (usable.length === 0) {
     return { ok: false, error: "Every ingredient was marked to leave out. Keep at least one." }
   }
-  const recipe = await generateRecipe(request)
+  const recipe = await generateRecipe(request, earlierTitles(previousTitles))
   if (recipe.ingredients.length === 0) return { ok: false, error: recipe.summary }
   return { ok: true, recipe, request }
 }

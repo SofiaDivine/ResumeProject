@@ -973,7 +973,7 @@ function buildSavoryPlate(ctx: Ctx): Built | null {
   }
 }
 
-export function composeLocalRecipe(input: GenerateInput): RecipeDraft {
+export function composeLocalRecipe(input: GenerateInput, skipTitles: string[] = []): RecipeDraft {
   const ctx = context(input)
   if (!ctx) {
     return {
@@ -990,25 +990,47 @@ export function composeLocalRecipe(input: GenerateInput): RecipeDraft {
   }
 
   const must = requiredItems(ctx)
-  let best: { technique: Technique; score: number; covered: number } | null = null
+  const ranked: { built: Built; covered: number; score: number; shelf: number }[] = []
+  let best: { built: Built; score: number; covered: number } | null = null
   for (const technique of TECHNIQUES) {
     const score = rate(technique, ctx)
     if (score < 0) continue
-    const covered = must.length === 0 ? 0 : coverCount(technique.build(ctx), must)
+    const built = technique.build(ctx)
+    const covered = must.length === 0 ? 0 : coverCount(built, must)
+    ranked.push({ built, covered, score, shelf: shelfUsed(ctx, built) })
     if (!best || covered > best.covered || (covered === best.covered && score > best.score)) {
-      best = { technique, score, covered }
+      best = { built, score, covered }
     }
   }
 
-  let raw = best ? best.technique.build(ctx) : fallback(ctx)
+  let raw = best ? best.built : fallback(ctx)
   const plate = buildSavoryPlate(ctx)
   if (plate) {
     const plateMust = coverCount(plate, must)
     const rawMust = coverCount(raw, must)
     const plateShelf = shelfUsed(ctx, plate)
     const rawShelf = shelfUsed(ctx, raw)
+    ranked.push({ built: plate, covered: plateMust, score: 0, shelf: plateShelf })
     if (plateMust > rawMust || (plateMust === rawMust && plateShelf > rawShelf)) raw = plate
   }
-  const built = annotate(ctx, foldRequired(raw, must))
-  return { ...built, source: "kitchen" }
+
+  const finish = (built: Built): RecipeDraft => ({ ...annotate(ctx, foldRequired(built, must)), source: "kitchen" })
+  const winner = finish(raw)
+  const ordered = [winner]
+  const byFit = [...ranked].sort((a, b) => b.covered - a.covered || b.shelf - a.shelf || b.score - a.score)
+  for (const item of byFit) {
+    const recipe = finish(item.built)
+    if (ordered.some((existing) => sameDish(existing.title, recipe.title))) continue
+    ordered.push(recipe)
+  }
+
+  const fresh = ordered.find((recipe) => !skipTitles.some((title) => sameDish(title, recipe.title)))
+  if (fresh) return fresh
+  const last = skipTitles.at(-1)
+  const at = ordered.findIndex((recipe) => last !== undefined && sameDish(recipe.title, last))
+  return ordered[(at + 1) % ordered.length]
+}
+
+function sameDish(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
 }
